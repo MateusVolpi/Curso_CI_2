@@ -11,55 +11,40 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     env:
-      HOST: localhost
-      PORT: 5432
-      USER: root
-      PASSWORD: root
-      DBNAME: root
-
+       HOST: localhost
+       PORT: 5432
+       USER: root
+       PASSWORD: root
+       DBNAME: root
     strategy:
       matrix:
         go_version: ['1.18', '1.17', '>=1.18']
-        os: ['ubuntu-latest']   # corrigido (antes tinha 'ubunto-latest')
-
+        os: ['ubunto-latest','ubuntu-latest']
     steps:
-      - uses: actions/checkout@v3
+    - uses: actions/checkout@v3
 
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ matrix.go_version }}
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ matrix.go_version }}
+      
+    - name: Build-DB
+      run: docker compose build
+      
+    - name: Create-DB
+      run: docker compose up -d
 
-      # garante o subcomando "docker compose"
-      - name: Ensure Docker Compose plugin
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose-plugin
-          docker compose version
-
-      - name: Build-DB
-        run: docker compose build
-
-      - name: Create-DB
-        run: docker compose up -d
-
-      - name: Test
-        run: go test -v main_test.go
-
-      # evita container pendurado no runner
-      - name: Down
-        if: always()
-        run: docker compose down
-
-
+    - name: Test
+      run: go test -v main_test.go 
+      
+  
   build:
     needs: test
-    runs-on: ubuntu-latest       # remove ubuntu-18.04 (descontinuado)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ['ubuntu-latest', 'ubuntu-18.04']
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: '1.18'     # escolha estável para o build final
-      - name: Build
-        run: go build -v main.go
+    - uses: actions/checkout@v3
+    - name: Build
+      run: go build -v main.go
