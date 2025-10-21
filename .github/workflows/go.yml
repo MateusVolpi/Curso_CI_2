@@ -6,67 +6,46 @@ on:
   pull_request:
     branches: [ '*' ]
 
-# evita filas quando há vários pushes na mesma branch
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
 
   test:
     timeout-minutes: 15
     runs-on: ${{ matrix.os }}
     env:
-      HOST: localhost
-      PORT: 5432
-      USER: root
-      PASSWORD: root
-      DBNAME: root
+       HOST: localhost
+       PORT: 5432
+       USER: root
+       PASSWORD: root
+       DBNAME: root
     strategy:
-      fail-fast: false
       matrix:
         go_version: ['1.18', '1.17', '>=1.18']
-        os: ['ubuntu-latest']        # corrigido (removido 'ubunto-latest')
+        os: ['ubunto-latest','ubuntu-latest']
     steps:
-      - uses: actions/checkout@v3
+    - uses: actions/checkout@v3
 
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ matrix.go_version }}
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ matrix.go_version }}
+      
+    - name: Build-DB
+      run: docker compose build
+      
+    - name: Create-DB
+      run: docker compose up -d
 
-      - name: Ensure Docker Compose plugin
-        if: matrix.go_version == '>=1.18' && matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose-plugin
-          docker compose version
-
-      # Sobe containers só em UMA célula da matriz (evita fila)
-      - name: Build-DB
-        if: matrix.go_version == '>=1.18' && matrix.os == 'ubuntu-latest'
-        run: docker compose -f docker-compose.yml build
-
-      - name: Create-DB
-        if: matrix.go_version == '>=1.18' && matrix.os == 'ubuntu-latest'
-        run: docker compose -f docker-compose.yml up -d
-
-      - name: Test
-        run: go test -v main_test.go
-
-      - name: Down
-        if: always() && matrix.go_version == '>=1.18' && matrix.os == 'ubuntu-latest'
-        run: docker compose -f docker-compose.yml down
-
+    - name: Test
+      run: go test -v main_test.go 
+      
+  
   build:
     needs: test
-    timeout-minutes: 15
-    runs-on: ubuntu-latest           # removido ubuntu-18.04 (descontinuado)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ['ubuntu-latest', 'ubuntu-latest']
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: '1.18'
-      - name: Build
-        run: go build -v main.go
+    - uses: actions/checkout@v3
+    - name: Build
+      run: go build -v main.go
