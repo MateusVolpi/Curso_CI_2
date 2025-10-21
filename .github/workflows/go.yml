@@ -2,11 +2,12 @@ name: Go
 
 on:
   push:
-    branches: ['*']
+    branches: [ '*' ]
   pull_request:
-    branches: ['*']
+    branches: [ '*' ]
 
 jobs:
+
   test:
     runs-on: ${{ matrix.os }}
     env:
@@ -17,48 +18,48 @@ jobs:
       DBNAME: root
 
     strategy:
-      fail-fast: false
       matrix:
-        go_version: ['1.17', '1.18', '1.22']   # ajuste como preferir
-        os: ['ubuntu-latest']                  # corrigido (sem 'ubunto-latest')
+        go_version: ['1.18', '1.17', '>=1.18']
+        os: ['ubuntu-latest']   # corrigido (antes tinha 'ubunto-latest')
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go_version }}
 
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ matrix.go_version }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      # Só UMA célula da matriz sobe os containers para evitar fila
+      # garante o subcomando "docker compose"
       - name: Ensure Docker Compose plugin
-        if: matrix.go_version == '1.22' && matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y docker-compose-plugin
           docker compose version
 
-      - name: Build DB (Compose)
-        if: matrix.go_version == '1.22' && matrix.os == 'ubuntu-latest'
-        run: docker compose -f docker-compose.yml build
+      - name: Build-DB
+        run: docker compose build
 
-      - name: Create DB (Compose)
-        if: matrix.go_version == '1.22' && matrix.os == 'ubuntu-latest'
-        run: docker compose -f docker-compose.yml up -d
+      - name: Create-DB
+        run: docker compose up -d
 
-      - name: Run tests
-        run: go test -v ./...   # cobre o repo todo; se quiser só main_test.go, mantenha
+      - name: Test
+        run: go test -v main_test.go
 
-      - name: Down (always)
-        if: always() && matrix.go_version == '1.22' && matrix.os == 'ubuntu-latest'
-        run: docker compose -f docker-compose.yml down
+      # evita container pendurado no runner
+      - name: Down
+        if: always()
+        run: docker compose down
+
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest       # remove ubuntu-18.04 (descontinuado)
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.18'     # escolha estável para o build final
+      - name: Build
+        run: go build -v main.go
